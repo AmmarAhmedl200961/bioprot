@@ -1,0 +1,11 @@
+numpy
+scipy
+cryptography
+scikit-learn
+matplotlib
+pytest
+facenet-pytorch
+torch
+torchvision
+Pillow
+gradio
