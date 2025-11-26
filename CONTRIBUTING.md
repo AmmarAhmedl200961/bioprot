@@ -51,7 +51,7 @@ Please be respectful and constructive in all interactions. We welcome contributi
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/bioprot.git
+git clone https://github.com/AmmarAhmedl200961/bioprot.git
 cd bioprot
 
 # Create virtual environment
