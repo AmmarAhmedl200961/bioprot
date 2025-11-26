@@ -179,7 +179,10 @@ class TestIrreversibilityTests:
         # Normalize embeddings
         embeddings = [e / np.linalg.norm(e) for e in embeddings]
         
-        seeds = [f"seed_{i:02d}_1234567890123456789".encode('utf-8') for i in range(n_samples)]
+        # Generate seeds with proper 32-byte length (standard for this project)
+        # The seed format follows the pattern used in test_protect.py
+        seed_length = 32
+        seeds = [f"seed_{i:02d}".ljust(seed_length, '_').encode('utf-8') for i in range(n_samples)]
         
         return embeddings, seeds
     
