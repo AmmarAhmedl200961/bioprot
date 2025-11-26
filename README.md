@@ -67,13 +67,13 @@ Our evaluation demonstrates the effectiveness of both protection methods:
 │  │   │ (from KMS)  │         │  • Ortho+Sign (default)      │    │  │
 │  │   └─────────────┘         │  • Perm+LUT (alternative)    │    │  │
 │  │                           └──────────────┬───────────────┘    │  │
-│  └──────────────────────────────────────────┬────────────────────┘  │
+│  └──────────────────────────────────────────┼────────────────────┘  │
 │                                             ▼                       │
-│                          ┌────────────────────────────┐         │
+│                          ┌────────────────────────────────┐         │
 │                          │    Protected Template          │         │
 │                          │    (Binary, Irreversible)      │         │
 │                          │    64 bytes, JSON serialized   │         │
-│                          └────────────────────────────┘         │
+│                          └────────────────────────────────┘         │
 │                                                                      │
 │  ┌────────────────────────────────────────────────────────────────┐  │
 │  │                  Key Management Simulator (KMS)                │  │
@@ -311,6 +311,41 @@ tests/test_protect.py::test_ortho_sign_different_seeds ✓
 
 ---
 
+## 📈 Evaluation
+
+### ROC Curve Analysis
+
+```bash
+python evaluate.py roc --embeddings embeddings/ --output results/roc_curve.png
+```
+
+Compares genuine vs impostor score distributions and plots ROC curve.
+
+### Irreversibility Test
+
+```bash
+python evaluate.py irreversibility --method ortho --n-samples 100
+```
+
+Attempts to reconstruct original embeddings from templates using:
+1. **Naive inversion**: Direct matrix pseudo-inverse
+2. **Regression attack**: Train MLP to predict embeddings
+
+Both attacks should fail with high reconstruction error.
+
+### Key Rotation (Revocation) Test
+
+```bash
+python evaluate.py revocation --user alice
+```
+
+Verifies that:
+1. Template before rotation matches probe
+2. Template after rotation does NOT match same probe
+3. New enrollment after rotation works correctly
+
+---
+
 ## 🔒 Security Analysis
 
 ### Threat Model
@@ -351,6 +386,31 @@ tests/test_protect.py::test_ortho_sign_different_seeds ✓
 
 ---
 
+## 🔧 Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `BIOPROT_KMS_PASSPHRASE` | Passphrase for KMS encryption | (required) |
+| `BIOPROT_KMS_PATH` | Path to KMS storage file | `./kms_store.bin` |
+| `BIOPROT_TEMPLATE_DIR` | Directory for templates | `./templates/` |
+
+### Protection Parameters
+
+```python
+# Ortho+Sign (in protect.py)
+ORTHO_DIM = 512          # Output dimension
+ORTHO_THRESHOLD = 0.80   # Default match threshold
+
+# Perm+LUT (in protect.py)
+PERMLUT_GROUPS = 64      # Number of groups (k)
+PERMLUT_BINS = 4         # Quantization bins (L)
+PERMLUT_THRESHOLD = 0.75 # Default match threshold
+```
+
+---
+
 ## 📚 References
 
 1. Ratha, N. K., Connell, J. H., & Bolle, R. M. (2001). "Enhancing security and privacy in biometrics-based authentication systems." *IBM Systems Journal*, 40(3).
@@ -369,6 +429,18 @@ tests/test_protect.py::test_ortho_sign_different_seeds ✓
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+```
+MIT License
+
+Copyright (c) 2024 BioProt Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software...
+```
+
 ---
 
 ## 🙏 Acknowledgments
@@ -386,5 +458,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-protection-methods">Methods</a> •
   <a href="#-testing">Testing</a> •
-  <a href="#-security-analysis">Security</a>
+  <a href="#-evaluation">Evaluation</a>
 </p>

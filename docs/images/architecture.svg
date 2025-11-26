@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+  <defs>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4a90d9;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#357abd;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#5cb85c;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#449d44;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#9b59b6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8e44ad;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f39c12;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e67e22;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="800" height="500" fill="#f8f9fa"/>
+  
+  <!-- Title -->
+  <text x="400" y="35" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#2c3e50">BioProt Architecture</text>
+  
+  <!-- Face Image Box -->
+  <rect x="50" y="70" width="120" height="80" rx="10" fill="url(#blueGrad)" stroke="#2980b9" stroke-width="2"/>
+  <text x="110" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="white">📷 Face</text>
+  <text x="110" y="125" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="white">Image</text>
+  
+  <!-- Arrow 1 -->
+  <line x1="170" y1="110" x2="220" y2="110" stroke="#7f8c8d" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7f8c8d"/>
+    </marker>
+  </defs>
+  
+  <!-- FaceNet Box -->
+  <rect x="230" y="70" width="140" height="80" rx="10" fill="url(#greenGrad)" stroke="#27ae60" stroke-width="2"/>
+  <text x="300" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="white">🧠 FaceNet</text>
+  <text x="300" y="120" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="white">(MTCNN + ResNet)</text>
+  <text x="300" y="140" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="white">512-dim embedding</text>
+  
+  <!-- Arrow 2 -->
+  <line x1="370" y1="110" x2="420" y2="110" stroke="#7f8c8d" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Protection Layer Box -->
+  <rect x="430" y="60" width="180" height="100" rx="10" fill="url(#purpleGrad)" stroke="#8e44ad" stroke-width="2"/>
+  <text x="520" y="90" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="white">🔐 Protection</text>
+  <text x="520" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="white">Transform</text>
+  <text x="520" y="135" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="white">• Ortho+Sign</text>
+  <text x="520" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="white">• Perm+LUT</text>
+  
+  <!-- Arrow 3 -->
+  <line x1="610" y1="110" x2="660" y2="110" stroke="#7f8c8d" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Protected Template Box -->
+  <rect x="670" y="70" width="110" height="80" rx="10" fill="url(#orangeGrad)" stroke="#d35400" stroke-width="2"/>
+  <text x="725" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="white">📄 Template</text>
+  <text x="725" y="120" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="white">(64 bytes)</text>
+  <text x="725" y="140" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="white">Irreversible</text>
+  
+  <!-- KMS Box -->
+  <rect x="430" y="200" width="180" height="120" rx="10" fill="#34495e" stroke="#2c3e50" stroke-width="2"/>
+  <text x="520" y="230" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="white">🔑 Key Management</text>
+  <text x="520" y="250" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="white">Simulator (KMS)</text>
+  <text x="520" y="280" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#bdc3c7">• PBKDF2 derivation</text>
+  <text x="520" y="298" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#bdc3c7">• Fernet encryption</text>
+  <text x="520" y="316" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#bdc3c7">• Key rotation</text>
+  
+  <!-- Arrow from KMS to Protection -->
+  <line x1="520" y1="200" x2="520" y2="165" stroke="#7f8c8d" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="545" y="185" font-family="Arial, sans-serif" font-size="10" fill="#7f8c8d">seed</text>
+  
+  <!-- Security Properties -->
+  <rect x="50" y="200" width="320" height="180" rx="10" fill="white" stroke="#bdc3c7" stroke-width="1"/>
+  <text x="210" y="225" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#2c3e50">Security Properties</text>
+  
+  <text x="70" y="255" font-family="Arial, sans-serif" font-size="12" fill="#27ae60">✓</text>
+  <text x="90" y="255" font-family="Arial, sans-serif" font-size="12" fill="#2c3e50">Cancelable - Rotate keys to revoke</text>
+  
+  <text x="70" y="285" font-family="Arial, sans-serif" font-size="12" fill="#27ae60">✓</text>
+  <text x="90" y="285" font-family="Arial, sans-serif" font-size="12" fill="#2c3e50">Irreversible - Cannot reconstruct face</text>
+  
+  <text x="70" y="315" font-family="Arial, sans-serif" font-size="12" fill="#27ae60">✓</text>
+  <text x="90" y="315" font-family="Arial, sans-serif" font-size="12" fill="#2c3e50">Unlinkable - Different seeds → different templates</text>
+  
+  <text x="70" y="345" font-family="Arial, sans-serif" font-size="12" fill="#27ae60">✓</text>
+  <text x="90" y="345" font-family="Arial, sans-serif" font-size="12" fill="#2c3e50">Deterministic - Same input → same output</text>
+  
+  <text x="70" y="375" font-family="Arial, sans-serif" font-size="12" fill="#27ae60">✓</text>
+  <text x="90" y="375" font-family="Arial, sans-serif" font-size="12" fill="#2c3e50">Efficient - Hamming distance matching</text>
+  
+  <!-- Workflow Summary -->
+  <rect x="50" y="420" width="700" height="60" rx="10" fill="#ecf0f1" stroke="#bdc3c7" stroke-width="1"/>
+  <text x="400" y="445" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#2c3e50">
+    <tspan font-weight="bold">Workflow:</tspan> Face → FaceNet (512-dim) → Protection Transform → Binary Template (64 bytes)
+  </text>
+  <text x="400" y="465" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#7f8c8d">
+    Matching uses Hamming similarity. Threshold typically 0.75-0.85.
+  </text>
+</svg>

@@ -1,178 +1,309 @@
 """
-Key Management Simulator (KMS) - Secure Key Storage
+Local Key Management System (KMS) simulator.
 
-Provides encrypted storage for user-specific seeds used in template protection.
-Uses PBKDF2 for key derivation and Fernet (AES-128-CBC) for encryption.
+Provides file-backed, encrypted storage for user-specific seeds.
+Uses PBKDF2 + Fernet for encryption.
+
+WARNING: This is a prototype KMS for demonstration purposes only.
+Production systems should use Hardware Security Modules (HSM) or
+cloud-based KMS solutions.
 """
 
-import os
-import json
 import base64
 import hashlib
+import json
+import os
 import secrets
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
-from cryptography.fernet import Fernet
+
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.fernet import Fernet
 
 
 class LocalKMS:
-    """Local Key Management Simulator with encrypted storage."""
+    """
+    Local file-backed Key Management System.
     
-    ITERATIONS = 480_000  # OWASP 2023 recommendation for PBKDF2-SHA256
+    Stores user seeds in an encrypted JSON file using passphrase-derived key.
+    """
     
-    def __init__(self, store_path: str = "kms_store.bin", 
-                 passphrase: Optional[str] = None):
+    DEFAULT_STORE_PATH = Path.home() / ".local" / "share" / "bioprot" / "kms_store.bin"
+    
+    def __init__(self, store_path: Optional[Path] = None, passphrase: Optional[str] = None):
         """
-        Initialize KMS with encrypted store.
+        Initialize LocalKMS.
         
         Args:
-            store_path: Path to encrypted key store file
-            passphrase: Master passphrase (or set BIOPROT_KMS_PASSPHRASE env var)
+            store_path: Path to encrypted key store file (default: ~/.local/share/bioprot/kms_store.bin)
+            passphrase: Passphrase for encryption (if None, will prompt or use env var)
         """
-        self.store_path = Path(store_path)
-        self._passphrase = passphrase or os.environ.get("BIOPROT_KMS_PASSPHRASE")
+        self.store_path = Path(store_path) if store_path else self.DEFAULT_STORE_PATH
         
-        if not self._passphrase:
-            raise ValueError(
-                "KMS passphrase required. Set BIOPROT_KMS_PASSPHRASE environment "
-                "variable or pass passphrase parameter."
-            )
+        # Get passphrase
+        if passphrase is None:
+            passphrase = os.environ.get("BIOPROT_KMS_PASSPHRASE")
+            if passphrase is None:
+                import getpass
+                passphrase = getpass.getpass("Enter KMS passphrase: ")
         
-        self._salt = self._get_or_create_salt()
-        self._fernet = self._derive_fernet()
-        self._keys: Dict[str, Dict[str, Any]] = self._load_store()
+        self.passphrase = passphrase
+        self._cipher = self._derive_cipher(passphrase)
+        
+        # Create store directory if needed
+        self.store_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Load or initialize store
+        self._store: Dict[str, Dict[str, Any]] = self._load_store()
     
-    def _get_or_create_salt(self) -> bytes:
-        """Get existing salt or create new one."""
-        salt_path = self.store_path.with_suffix(".salt")
-        if salt_path.exists():
-            return salt_path.read_bytes()
-        else:
-            salt = secrets.token_bytes(16)
-            salt_path.write_bytes(salt)
-            return salt
-    
-    def _derive_fernet(self) -> Fernet:
-        """Derive Fernet key from passphrase using PBKDF2."""
+    def _derive_cipher(self, passphrase: str) -> Fernet:
+        """
+        Derive Fernet cipher from passphrase using PBKDF2.
+        
+        Args:
+            passphrase: User passphrase
+            
+        Returns:
+            Fernet cipher instance
+        """
+        # Use a fixed salt for the KMS instance (stored with the file)
+        # In a real system, salt should be stored separately
+        salt = b"bioprot_kms_salt_v1"  # Fixed for prototype
+        
+        # Derive 32-byte key using PBKDF2
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
-            salt=self._salt,
-            iterations=self.ITERATIONS,
+            salt=salt,
+            iterations=480000,  # OWASP recommended (2023)
         )
-        key = base64.urlsafe_b64encode(kdf.derive(self._passphrase.encode()))
-        return Fernet(key)
+        key = kdf.derive(passphrase.encode('utf-8'))
+        
+        # Fernet requires base64-encoded key
+        key_b64 = base64.urlsafe_b64encode(key)
+        return Fernet(key_b64)
     
     def _load_store(self) -> Dict[str, Dict[str, Any]]:
-        """Load and decrypt key store."""
+        """
+        Load encrypted store from disk.
+        
+        Returns:
+            Decrypted store dictionary
+        """
         if not self.store_path.exists():
             return {}
         
         try:
-            encrypted = self.store_path.read_bytes()
-            decrypted = self._fernet.decrypt(encrypted)
-            return json.loads(decrypted.decode())
-        except Exception:
-            # Invalid passphrase or corrupted store
-            return {}
+            with open(self.store_path, 'rb') as f:
+                encrypted_data = f.read()
+            
+            decrypted_data = self._cipher.decrypt(encrypted_data)
+            store = json.loads(decrypted_data.decode('utf-8'))
+            return store
+        except Exception as e:
+            raise ValueError(f"Failed to load KMS store (wrong passphrase?): {e}")
     
-    def _save_store(self) -> None:
-        """Encrypt and save key store."""
-        data = json.dumps(self._keys).encode()
-        encrypted = self._fernet.encrypt(data)
-        self.store_path.write_bytes(encrypted)
+    def _save_store(self):
+        """Save encrypted store to disk."""
+        # Serialize store to JSON
+        json_data = json.dumps(self._store, indent=2)
+        
+        # Encrypt
+        encrypted_data = self._cipher.encrypt(json_data.encode('utf-8'))
+        
+        # Write atomically (write to temp, then rename)
+        temp_path = self.store_path.with_suffix('.tmp')
+        with open(temp_path, 'wb') as f:
+            f.write(encrypted_data)
+        
+        temp_path.replace(self.store_path)
     
-    def create_user_key(self, user_id: str, method: str = "ortho") -> int:
-        """Create new seed for user.
+    def create_user_key(self, user_id: str) -> bytes:
+        """
+        Create a new seed for a user.
         
         Args:
-            user_id: Unique user identifier
-            method: Protection method ('ortho' or 'perm')
+            user_id: User identifier
             
         Returns:
-            Generated seed value
+            Generated seed bytes
+            
+        Raises:
+            ValueError: If user already exists
         """
-        seed = secrets.randbelow(2**31)  # Positive 32-bit integer
+        if user_id in self._store:
+            raise ValueError(f"User '{user_id}' already exists. Use rotate_user_key to change.")
         
-        self._keys[user_id] = {
-            "seed": seed,
-            "method": method,
+        # Generate cryptographically secure random seed
+        seed = secrets.token_bytes(32)
+        
+        # Store
+        self._store[user_id] = {
+            "seed_hex": seed.hex(),
+            "created_at": datetime.utcnow().isoformat() + "Z",
             "version": 1,
-            "created_at": self._timestamp()
+            "metadata": {}
         }
-        self._save_store()
         
+        self._save_store()
         return seed
     
-    def get_user_seed(self, user_id: str) -> Optional[int]:
-        """Retrieve user's current seed."""
-        if user_id not in self._keys:
-            return None
-        return self._keys[user_id]["seed"]
-    
-    def get_user_method(self, user_id: str) -> Optional[str]:
-        """Retrieve user's protection method."""
-        if user_id not in self._keys:
-            return None
-        return self._keys[user_id].get("method", "ortho")
-    
-    def rotate_user_key(self, user_id: str) -> Optional[int]:
-        """Generate new seed for user (for cancelability).
+    def get_user_seed(self, user_id: str) -> Optional[bytes]:
+        """
+        Retrieve seed for a user.
         
         Args:
-            user_id: User to rotate key for
+            user_id: User identifier
             
         Returns:
-            New seed value, or None if user doesn't exist
+            Seed bytes, or None if user doesn't exist
         """
-        if user_id not in self._keys:
+        if user_id not in self._store:
             return None
         
-        old_version = self._keys[user_id].get("version", 1)
-        new_seed = secrets.randbelow(2**31)
+        seed_hex = self._store[user_id]["seed_hex"]
+        return bytes.fromhex(seed_hex)
+    
+    def rotate_user_key(self, user_id: str) -> bytes:
+        """
+        Rotate (regenerate) seed for a user.
         
-        self._keys[user_id]["seed"] = new_seed
-        self._keys[user_id]["version"] = old_version + 1
-        self._keys[user_id]["rotated_at"] = self._timestamp()
+        Old templates will become invalid.
+        
+        Args:
+            user_id: User identifier
+            
+        Returns:
+            New seed bytes
+            
+        Raises:
+            ValueError: If user doesn't exist
+        """
+        if user_id not in self._store:
+            raise ValueError(f"User '{user_id}' does not exist. Use create_user_key first.")
+        
+        # Generate new seed
+        new_seed = secrets.token_bytes(32)
+        
+        # Update store (increment version)
+        old_version = self._store[user_id].get("version", 1)
+        self._store[user_id]["seed_hex"] = new_seed.hex()
+        self._store[user_id]["version"] = old_version + 1
+        self._store[user_id]["rotated_at"] = datetime.utcnow().isoformat() + "Z"
+        
         self._save_store()
-        
         return new_seed
     
-    def delete_user(self, user_id: str) -> bool:
-        """Delete user's key."""
-        if user_id not in self._keys:
-            return False
+    def store_user_metadata(self, user_id: str, metadata: Dict[str, Any]):
+        """
+        Store arbitrary metadata for a user.
         
-        del self._keys[user_id]
+        Args:
+            user_id: User identifier
+            metadata: Metadata dictionary
+            
+        Raises:
+            ValueError: If user doesn't exist
+        """
+        if user_id not in self._store:
+            raise ValueError(f"User '{user_id}' does not exist.")
+        
+        self._store[user_id]["metadata"] = metadata
         self._save_store()
-        return True
     
-    def list_users(self) -> list:
-        """List all user IDs."""
-        return list(self._keys.keys())
-    
-    def get_user_info(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get user key metadata (without exposing seed)."""
-        if user_id not in self._keys:
+    def get_user_metadata(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve metadata for a user.
+        
+        Args:
+            user_id: User identifier
+            
+        Returns:
+            Metadata dictionary, or None if user doesn't exist
+        """
+        if user_id not in self._store:
             return None
         
-        info = self._keys[user_id].copy()
-        info.pop("seed", None)  # Don't expose seed
-        return info
+        return self._store[user_id].get("metadata", {})
     
-    def _timestamp(self) -> str:
-        """Get current ISO timestamp."""
-        from datetime import datetime
-        return datetime.utcnow().isoformat() + "Z"
+    def get_user_version(self, user_id: str) -> Optional[int]:
+        """
+        Get the current seed version for a user.
+        
+        Args:
+            user_id: User identifier
+            
+        Returns:
+            Seed version number, or None if user doesn't exist
+        """
+        if user_id not in self._store:
+            return None
+        
+        return self._store[user_id].get("version", 1)
     
-    def export_public_info(self) -> Dict[str, Any]:
-        """Export non-sensitive KMS info."""
-        return {
-            "user_count": len(self._keys),
-            "users": {
-                uid: self.get_user_info(uid) 
-                for uid in self._keys
+    def delete_user(self, user_id: str):
+        """
+        Delete a user and their seed.
+        
+        Args:
+            user_id: User identifier
+            
+        Raises:
+            ValueError: If user doesn't exist
+        """
+        if user_id not in self._store:
+            raise ValueError(f"User '{user_id}' does not exist.")
+        
+        del self._store[user_id]
+        self._save_store()
+    
+    def list_users(self) -> list:
+        """
+        List all user IDs in the store.
+        
+        Returns:
+            List of user IDs
+        """
+        return list(self._store.keys())
+    
+    def export_store(self, output_path: Path, include_seeds: bool = False):
+        """
+        Export store metadata to JSON file (optionally without seeds).
+        
+        Args:
+            output_path: Path to write JSON file
+            include_seeds: If True, include seed_hex in export (SENSITIVE!)
+        """
+        export_data = {}
+        for user_id, data in self._store.items():
+            user_export = {
+                "created_at": data.get("created_at"),
+                "version": data.get("version"),
+                "metadata": data.get("metadata", {})
             }
-        }
+            if include_seeds:
+                user_export["seed_hex"] = data["seed_hex"]
+            
+            export_data[user_id] = user_export
+        
+        with open(output_path, 'w') as f:
+            json.dump(export_data, f, indent=2)
+
+
+def get_or_create_seed(kms: LocalKMS, user_id: str) -> bytes:
+    """
+    Helper function to get existing seed or create new one.
+    
+    Args:
+        kms: LocalKMS instance
+        user_id: User identifier
+        
+    Returns:
+        User seed bytes
+    """
+    seed = kms.get_user_seed(user_id)
+    if seed is None:
+        seed = kms.create_user_key(user_id)
+    return seed
